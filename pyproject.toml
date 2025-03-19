@@ -1,13 +1,99 @@
+[tool.poetry]
+name = "ai-api-wrapper"
+version = "0.1.1"
+description = "A unified API wrapper for various AI providers with proxy support"
+authors = ["James Ding <xingshizhai@gmail.com>"]
+readme = "README.md"
+packages = [{include = "ai_api_wrapper"}]
+license = "GPL-3.0-or-later"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[tool.poetry.dependencies]
+python = ">=3.8"
+openai = "^1.12.0"
+httpx = "^0.26.0"
+pydantic = "^2.6.1"
+python-dotenv = "^1.0.1"
+typing-extensions = "^4.9.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+pytest-asyncio = "^0.23.5"
+black = "^24.1.1"
+isort = "^5.13.2"
+mypy = "^1.8.0"
+pytest-cov = "^4.1.0"
+build = "^1.0.3"
+twine = "^4.0.2"
+
 [build-system]
-requires = ["setuptools>=42", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 100
+
+[tool.pylint]
+max-line-length = 100
+disable = ["C0111"]  # missing-docstring
+enable = ["C0115", "C0116"]  # missing class/function docstring
+good-names = ["i", "j", "k", "ex", "Run", "_"]
+max-args = 8
+
+[tool.pylint.messages_control]
+disable = [
+    "missing-docstring",
+    "invalid-name",
+]
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.pylint.basic]
+good-names = ["i", "j", "k", "ex", "Run", "_"]
+# All docstrings and comments must be in English
+docstring-min-length = 10
+no-docstring-rgx = "^_"
+docstring-convention = "google"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --cov=ai_api_wrapper --cov-report=html"
 
 [project]
 name = "ai-api-wrapper"
 version = "0.1.0"
 description = "A unified wrapper for various AI API services"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.8"
 license = {text = "GPL v3.0"}
 authors = [
     {name = "James Ding", email = "xingshizhai@gmail.com"},

@@ -172,4 +172,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-src/ai_api_wrapper/config/local.json
+ai_api_wrapper/config/config.json
+.vscode
+logs
+.DS_Store

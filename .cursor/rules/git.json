@@ -1,0 +1,45 @@
+{
+    "version": "1.0",
+    "rules": {
+        "commit_messages": {
+            "language": "english",
+            "tense": "present",
+            "format": {
+                "type": "conventional",
+                "types": [
+                    "feat",
+                    "fix",
+                    "docs",
+                    "style",
+                    "refactor",
+                    "test",
+                    "chore"
+                ]
+            },
+            "max_length": 72,
+            "body_required": false,
+            "footer_required": false
+        },
+        "branch_naming": {
+            "pattern": "<type>/<description>",
+            "types": [
+                "feature",
+                "bugfix",
+                "hotfix",
+                "release"
+            ],
+            "description_format": "kebab-case"
+        },
+        "pr_template": {
+            "required_sections": [
+                "description",
+                "changes",
+                "testing"
+            ],
+            "optional_sections": [
+                "screenshots",
+                "related_issues"
+            ]
+        }
+    }
+} 

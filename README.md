@@ -1,46 +1,167 @@
-# ai-api-wrapper
+# AI API Wrapper
 
-ai-api-wrapper/
-│
-├── src/
-│   └── ai_api_wrapper/
-│       ├── __init__.py
-│       ├── services/
-│       │   ├── __init__.py
-│       │   ├── ai_service.py
-│       │   ├── openai_service.py
-│       │   ├── message_types.py
-│       │   └── ... (其他AI服务实现)
-│       ├── utils/
-│       │   ├── __init__.py
-│       │   ├── config_manager.py
-│       │   └── logger.py
-│       └── config/
-│           ├── __init__.py
-│           ├── default_config.yaml
-│           └── ... (默认配置文件)
-│
-├── examples/
-│   ├── config/
-│   │   └── example_config.yaml
-│   ├── basic_usage.py
-│   └── streaming_example.py
-│
-├── tests/
-│   ├── __init__.py
-│   ├── test_openai_service.py
-│   └── ... (其他测试)
-│
-├── docs/
-│   └── ... (文档文件)
-│
-├── .gitignore
-├── LICENSE
-├── MANIFEST.in
-├── pyproject.toml
-├── README.md
-└── setup.py
+A unified API wrapper for various AI providers, with built-in proxy support.
 
+## Features
+
+- 🔄 **Unified Interface**: Access different AI models through a single, consistent API
+- 🌐 **Proxy Support**: Built-in proxy support, perfect for users in mainland China
+- 🤖 **Multiple Providers**: Support for various AI providers including:
+  - OpenAI
+  - Anthropic
+  - Azure OpenAI
+  - Google AI
+  - DeepSeek
+  - More providers coming soon...
+
+## Installation
+
+```bash
+# Using poetry
+poetry install
+
+# Or using pip
+pip install ai-api-wrapper
+```
+
+## Quick Start
+
+```python
+from ai_api_wrapper import Client
+
+# Create a client with proxy support
+proxy_config = {
+    "http": "http://127.0.0.1:7890",
+    "https": "http://127.0.0.1:7890"
+}
+client = Client(proxy_config=proxy_config)
+
+# Create a chat completion
+response = client.chat.completions.create(
+    model="deepseek:deepseek-chat",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Hello!"}
+    ],
+    temperature=0.7
+)
+
+# Print the response
+print(response.choices[0].message.content)
+```
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env` file in your project root with the following variables:
+
+```env
+# API Keys
+DEEPSEEK_API_KEY=your_api_key_here
+OPENAI_API_KEY=your_api_key_here
+ANTHROPIC_API_KEY=your_api_key_here
+GOOGLE_API_KEY=your_api_key_here
+AZURE_OPENAI_API_KEY=your_api_key_here
+
+# Base URLs (Optional, will override config.json if set)
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+OPENAI_BASE_URL=https://api.openai.com
+ANTHROPIC_BASE_URL=https://api.anthropic.com
+GOOGLE_BASE_URL=https://generativelanguage.googleapis.com
+AZURE_OPENAI_BASE_URL=https://your-resource.openai.azure.com
+```
+
+### Configuration File
+
+The project uses a single `config.json` file for non-sensitive configurations. Base URLs in this file will be overridden by environment variables if set:
+
+```json
+{
+    "deepseek": {
+        "base_url": "https://api.deepseek.com",
+        "timeout": 30.0,
+        "max_retries": 3,
+        "verify_ssl": true,
+        "models": {
+            "deepseek-chat": {
+                "max_tokens": 4000,
+                "temperature": 0.7
+            },
+            "deepseek-coder": {
+                "max_tokens": 4000,
+                "temperature": 0.7
+            }
+        }
+    },
+    "openai": {
+        "base_url": "https://api.openai.com",
+        "timeout": 30.0,
+        "max_retries": 3,
+        "verify_ssl": true
+    },
+    "anthropic": {
+        "base_url": "https://api.anthropic.com",
+        "timeout": 30.0,
+        "max_retries": 3,
+        "verify_ssl": true
+    },
+    "google": {
+        "base_url": "https://generativelanguage.googleapis.com",
+        "timeout": 30.0,
+        "max_retries": 3,
+        "verify_ssl": true
+    },
+    "azure": {
+        "base_url": "https://your-resource.openai.azure.com",
+        "timeout": 30.0,
+        "max_retries": 3,
+        "verify_ssl": true
+    },
+    "logging": {
+        "level": "INFO",
+        "file": "app.log"
+    }
+}
+```
+
+### Security Best Practices
+
+1. **Never commit sensitive information**
+   - Keep all API keys in `.env` file
+   - Add `.env` to your `.gitignore`
+   - Never commit API keys to version control
+
+2. **Configuration file**
+   - Keep `config.json` in version control
+   - Only include non-sensitive configurations
+   - Use environment variables for sensitive data and custom base URLs
+
+3. **Environment variables**
+   - Use `.env` file for local development
+   - Use system environment variables in production
+   - Never hardcode API keys or base URLs in your code
+
+## Development
+
+```bash
+# Install development dependencies
+poetry install --with dev
+
+# Run tests
+poetry run pytest
+
+# Format code
+poetry run black .
+poetry run isort .
+
+# Type checking
+poetry run mypy .
+```
+
+## License
+
+GPL v3
 
 
 # 配置系统说明
@@ -128,9 +249,6 @@ from utils.config_manager import ConfigManager
 
 config = ConfigManager()
 
-# 获取服务配置
-service_config = config.get_service_config('deepseek')
-
 # 获取提供商配置
 provider_config = config.get_provider_config('deepseek', 'siliconflow')
 
@@ -140,6 +258,11 @@ model_config = config.get_model_config('deepseek', 'siliconflow', 'deepseek-chat
 # 获取已启用的服务
 enabled_services = config.get_enabled_services()
 ```
+
+## Test
+
+python -m pytest tests/ -v
+
 
 ## 注意事项
 

@@ -1,0 +1,61 @@
+{
+    "version": "1.0",
+    "rules": {
+        "review_checklist": {
+            "required_checks": [
+                "code_style",
+                "documentation",
+                "test_coverage",
+                "performance",
+                "security"
+            ],
+            "minimum_reviewers": 1,
+            "review_timeout": "3d"
+        },
+        "code_quality": {
+            "linters": {
+                "pylint": {
+                    "enabled": true,
+                    "min_score": 8.0
+                },
+                "mypy": {
+                    "enabled": true,
+                    "strict": true
+                }
+            },
+            "formatters": {
+                "black": {
+                    "enabled": true,
+                    "line_length": 100
+                },
+                "isort": {
+                    "enabled": true,
+                    "profile": "black"
+                }
+            }
+        },
+        "security": {
+            "required_checks": [
+                "dependency_scan",
+                "code_scan",
+                "secrets_scan"
+            ],
+            "blocking_issues": [
+                "critical",
+                "high"
+            ]
+        },
+        "performance": {
+            "metrics": [
+                "response_time",
+                "memory_usage",
+                "cpu_usage"
+            ],
+            "thresholds": {
+                "response_time": "500ms",
+                "memory_usage": "100MB",
+                "cpu_usage": "80%"
+            }
+        }
+    }
+} 

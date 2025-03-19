@@ -1,0 +1,54 @@
+{
+    "version": "1.0",
+    "rules": {
+        "language": {
+            "comments": "english",
+            "docstrings": "english",
+            "documentation": "english",
+            "variable_names": "english",
+            "function_names": "english",
+            "class_names": "english",
+            "log_messages": "english",
+            "error_messages": "english"
+        },
+        "python": {
+            "style_guide": "PEP 8",
+            "max_line_length": 100,
+            "docstring_style": "google",
+            "type_hints": "required",
+            "imports": {
+                "style": "isort",
+                "order": [
+                    "standard_library",
+                    "third_party",
+                    "local"
+                ]
+            }
+        },
+        "documentation": {
+            "public_functions": "required",
+            "public_classes": "required",
+            "docstring_format": {
+                "style": "google",
+                "sections": [
+                    "Args",
+                    "Returns",
+                    "Raises",
+                    "Examples"
+                ]
+            }
+        },
+        "testing": {
+            "naming_pattern": "test_<function_name>_<scenario>",
+            "docstrings": "required",
+            "coverage": {
+                "minimum": 80,
+                "exclude_patterns": [
+                    "__init__.py",
+                    "setup.py",
+                    "conftest.py"
+                ]
+            }
+        }
+    }
+} 
