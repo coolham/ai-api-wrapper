@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Type, Union
 from .provider import Provider, ProviderFactory
 from .utils.tools import Tools
 from .utils.config_manager import ConfigManager

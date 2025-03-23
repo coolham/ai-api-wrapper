@@ -1,8 +1,11 @@
-from typing import Callable, Dict, Any, Type, Optional, List, Union, Tuple
+from typing import Callable, Dict, Any, Type, Optional, List, Union, Tuple, Collection
 from pydantic import BaseModel, create_model, Field, ValidationError
 import inspect
 import json
 from docstring_parser import parse
+import importlib
+import re
+import yaml
 
 
 class Tools:
@@ -27,7 +30,7 @@ class Tools:
         }
 
     # Return tools in the specified format (default OpenAI).
-    def tools(self, format="openai") -> list:
+    def tools(self, format: str = "openai") -> list:
         """Return tools in the specified format (default OpenAI)."""
         if format == "openai":
             return self.__convert_to_openai_format()
@@ -48,7 +51,7 @@ class Tools:
             if hasattr(field_type, "__members__"):  # Check if it's an enum
                 enum_values = [
                     member.value if hasattr(member, "value") else member.name
-                    for member in field_type
+                    for member in field_type  # type: ignore
                 ]
                 properties[field_name] = {
                     "type": "string",
@@ -64,7 +67,7 @@ class Tools:
                     )
             else:
                 properties[field_name] = {
-                    "type": type_mapping.get(field_type, str(field_type)),
+                    "type": type_mapping.get(field_type, str(field_type)) if field_type else "any",
                     "description": field.description or "",
                 }
                 # Add default if it exists and isn't PydanticUndefined
@@ -80,12 +83,12 @@ class Tools:
                 "required": [
                     name
                     for name, field in param_model.model_fields.items()
-                    if field.is_required and str(field.default) == "PydanticUndefined"
+                    if field.is_required and str(field.default) == "PydanticUndefined"  # type: ignore
                 ],
             },
         }
 
-    def __extract_param_descriptions(self, func: Callable) -> dict[str, str]:
+    def __extract_param_descriptions(self, func: Callable) -> Dict[str, str]:
         """Extract parameter descriptions from function docstring.
 
         Args:
@@ -105,10 +108,10 @@ class Tools:
 
     def __infer_from_signature(
         self, func: Callable
-    ) -> tuple[Dict[str, Any], Type[BaseModel]]:
+    ) -> Tuple[Dict[str, Any], Type[BaseModel]]:
         """Infer parameters(required and optional) and requirements directly from the function signature."""
         signature = inspect.signature(func)
-        fields = {}
+        fields: Dict[str, Tuple[Any, Any]] = {}
         required_fields = []
 
         # Get function's docstring and parse parameter descriptions
@@ -142,7 +145,12 @@ class Tools:
                 )
 
         # Dynamically create a Pydantic model based on inferred fields
-        param_model = create_model(f"{func.__name__.capitalize()}Params", **fields)
+        model_name = f"{func.__name__.capitalize()}Params"
+        kwargs = {
+            "__module__": func.__module__,
+            **fields
+        }
+        param_model = create_model(model_name, **kwargs)  # type: ignore
 
         # Convert inferred model to a tool spec format
         tool_spec = self._convert_to_tool_spec(func, param_model)
@@ -283,3 +291,43 @@ class Tools:
                 raise ValueError(f"Error in tool '{tool_name}' parameters: {e}")
 
         return results, messages
+
+
+def get_class_qualname(cls):
+    """Get the qualified name of a class."""
+    return f"{cls.__module__}.{cls.__qualname__}"
+
+
+def load_yaml(file_path: str) -> Dict[str, Any]:
+    """Load a yaml file."""
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+            return data if data else {}
+    except Exception as e:
+        print(f"Error loading yaml file {file_path}: {e}")
+        return {}
+
+
+def snake_to_camel(snake_str: str) -> str:
+    """Convert snake_case to camelCase."""
+    components = snake_str.split("_")
+    return components[0] + "".join(x.title() for x in components[1:])
+
+
+def import_module(module_name: str) -> Any:
+    """Import a module dynamically."""
+    try:
+        return importlib.import_module(module_name)
+    except ImportError:
+        return None
+
+
+def is_valid_proxy_url(proxy: Optional[str]) -> bool:
+    """Validate proxy URL format."""
+    if not proxy:
+        return False
+    
+    # 验证代理URL格式
+    pattern = r"^(http|https|socks5)://([^:]+:[^@]+@)?[^:]+:\d+/?$"
+    return bool(re.match(pattern, proxy))
