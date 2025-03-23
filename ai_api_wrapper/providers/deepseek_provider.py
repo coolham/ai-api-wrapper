@@ -119,13 +119,10 @@ class DeepseekProvider(Provider):
             logger.info(f"Creating chat completion for model: {model}")
             logger.debug(f"Input messages: {messages}")
             
-            # 获取模型配置
-            model_config = self.config_manager.get_model_config('deepseek', model)
-            logger.debug(f"Model config loaded: {model_config}")
-            
-            # 使用模型配置中的默认值（如果未提供）
+            # 使用默认值或者从配置中获取max_tokens
             if max_tokens is None:
-                max_tokens = model_config.get('max_tokens', 4000)
+                # 从provider_config中尝试获取默认的max_tokens
+                max_tokens = self.provider_config.get('max_tokens', 4000)
                 logger.debug(f"Using default max_tokens: {max_tokens}")
             
             # 转换消息格式

@@ -1,19 +1,20 @@
 import os
 import json
+import yaml
 from pathlib import Path
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Union
 from dotenv import load_dotenv, find_dotenv
 from ai_api_wrapper.utils.logger import logger
-from ai_api_wrapper.utils.constants import PROJECT_ROOT
+from ai_api_wrapper.config.default_config import DEFAULT_CONFIG
+from ai_api_wrapper.config.config_schema import validate_config
 
 
 def get_project_root() -> Path:
-    """Get the project root directory"""
+    """获取项目根目录"""
     return Path(__file__).resolve().parent.parent
 
 
 PROJECT_ROOT = get_project_root()
-
 
 
 class ConfigManager:
@@ -21,19 +22,23 @@ class ConfigManager:
     _instance = None
     _config: Dict[str, Any] = {}
     _initialized = False
-    _config_dir = None
+    _user_config_path = None
     
-    def __new__(cls, config_dir: str = None):
+    def __new__(cls, config_path: Optional[Union[str, Path]] = None):
         if cls._instance is None:
             cls._instance = super(ConfigManager, cls).__new__(cls)
-            cls._config_dir = config_dir
+            cls._instance._initialized = False
+        elif config_path is not None and config_path != cls._instance._user_config_path:
+            # 如果配置路径变更，重置实例
+            cls._instance._initialized = False
         return cls._instance
     
-    def __init__(self, config_dir: str = None):
-        if not self._initialized:
-            self._config_dir = config_dir or os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config')
+    def __init__(self, config_path: Optional[Union[str, Path]] = None):
+        if not self._initialized or config_path != self._user_config_path:
+            self._user_config_path = config_path
+            # 重置配置
+            self._config = {}
             self._load_config()
-            self._load_env_config()
             self._initialized = True
     
     def _log_warning(self, message: str):
@@ -47,137 +52,142 @@ class ConfigManager:
     def _log_info(self, message: str):
         """记录信息日志"""
         logger.info(message)
+
+    @classmethod
+    def reset(cls):
+        """重置配置管理器实例，主要用于测试"""
+        cls._instance = None
+        cls._config = {}
+        cls._initialized = False
+        cls._user_config_path = None
     
-    def _get_config_paths(self) -> List[str]:
-        """获取配置文件路径列表，按优先级排序"""
-        return [
-            os.path.join(self._config_dir, 'default.json'),  # 默认配置
-            os.path.join(self._config_dir, 'local.json'),    # 本地配置（不提交到版本控制）
-            os.path.join(os.path.dirname(self._config_dir), 'config.json')  # 向后兼容
-        ]
+    def _load_config(self):
+        """加载配置"""
+        try:
+            # 1. 加载默认配置
+            self._config = DEFAULT_CONFIG.copy()
+            self._log_info("Loaded default config")
+            
+            # 2. 加载用户自定义配置（如果存在）
+            if self._user_config_path:
+                user_config_path = Path(self._user_config_path)
+                if user_config_path.exists():
+                    self._log_info(f"Loading user config from {user_config_path}")
+                    user_config = self._load_yaml_config(user_config_path)
+                    if user_config:
+                        self._log_info(f"Loaded user config: {user_config}")
+                        self._merge_config(user_config)
+                else:
+                    self._log_warning(f"User config file not found: {user_config_path}")
+            
+            # 3. 加载环境变量配置
+            self._load_env_config()
+            
+            # 4. 验证配置
+            if not validate_config(self._config):
+                self._log_warning("Config validation failed, using default config")
+                self._config = DEFAULT_CONFIG.copy()
+                self._load_env_config()
+            
+        except Exception as e:
+            self._log_error(f"Failed to load configuration: {str(e)}")
+            # 回退到默认配置
+            self._config = DEFAULT_CONFIG.copy()
+            self._load_env_config()
+    
+    def _load_yaml_config(self, path: Path) -> Dict[str, Any]:
+        """加载 YAML 配置文件
+        
+        Args:
+            path: YAML 文件路径
+            
+        Returns:
+            Dict[str, Any]: 加载的配置
+        """
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+                if config is None:
+                    return {}
+                return config
+        except Exception as e:
+            self._log_error(f"Failed to load YAML config: {str(e)}")
+            return {}
     
     def _load_env_config(self):
-        """从 .env 文件加载配置"""
+        """从环境变量加载配置"""
         # 加载 .env 文件
-        load_dotenv(find_dotenv())
+        load_dotenv(find_dotenv(usecwd=True))
         
         # 获取所有环境变量
         env_config = {}
         
         # 处理 AI 服务配置
-        for provider in ['grok', 'openai', 'anthropic', 'azure', 'google', 'deepseek', 'openrouter']:
+        for provider in ['openai', 'anthropic', 'grok', 'deepseek', 'openrouter', 'test_provider']:
             provider_config = {}
+            
+            # API 密钥
             api_key = os.getenv(f'{provider.upper()}_API_KEY')
             if api_key:
-                provider_config['api_key'] = api_key
-                
-            # 处理代理配置
-            if provider == 'grok':  # 目前只有 Grok 需要代理
-                http_proxy = os.getenv('HTTP_PROXY')
-                https_proxy = os.getenv('HTTPS_PROXY')
-                if http_proxy or https_proxy:
-                    provider_config['proxy'] = {
-                        'http': http_proxy,
-                        'https': https_proxy
-                    }
+                if "providers" not in env_config:
+                    env_config["providers"] = {}
+                if provider not in env_config["providers"]:
+                    env_config["providers"][provider] = {}
+                env_config["providers"][provider]["api_key"] = api_key
             
-            if provider_config:
-                env_config[provider] = provider_config
+            # 基础 URL
+            base_url = os.getenv(f'{provider.upper()}_BASE_URL')
+            if base_url:
+                if "providers" not in env_config:
+                    env_config["providers"] = {}
+                if provider not in env_config["providers"]:
+                    env_config["providers"][provider] = {}
+                env_config["providers"][provider]["base_url"] = base_url
+            
+            # 代理设置
+            use_proxy = os.getenv(f'{provider.upper()}_USE_PROXY')
+            if use_proxy is not None:
+                use_proxy = use_proxy.lower() == 'true'
+                if "providers" not in env_config:
+                    env_config["providers"] = {}
+                if provider not in env_config["providers"]:
+                    env_config["providers"][provider] = {}
+                env_config["providers"][provider]["use_proxy"] = use_proxy
+        
+        # 全局代理设置
+        http_proxy = os.getenv('HTTP_PROXY')
+        https_proxy = os.getenv('HTTPS_PROXY')
+        if http_proxy or https_proxy:
+            if "proxy" not in env_config:
+                env_config["proxy"] = {}
+            if http_proxy:
+                env_config["proxy"]["http"] = http_proxy
+            if https_proxy:
+                env_config["proxy"]["https"] = https_proxy
+                
+        # HTTP设置
+        timeout = os.getenv('HTTP_TIMEOUT')
+        if timeout:
+            try:
+                timeout_value = float(timeout)
+                if "http" not in env_config:
+                    env_config["http"] = {}
+                env_config["http"]["timeout"] = timeout_value
+            except ValueError:
+                self._log_warning(f"Invalid HTTP_TIMEOUT value: {timeout}")
         
         # 合并环境变量配置
         if env_config:
+            self._log_info(f"Loaded env config: {env_config}")
             self._merge_config(env_config)
     
-    def is_loaded(self) -> bool:
-        """检查配置是否已加载"""
-        return bool(self._config)
-    
-    def get_config(self) -> Dict[str, Any]:
-        """获取完整配置"""
-        return self._config.copy()
-    
-    def _load_config(self):
-        """加载配置文件"""
-        try:
-            # 首先加载默认配置
-            config_loaded = False
-            for config_path in self._get_config_paths():
-                if os.path.exists(config_path):
-                    with open(config_path, 'r', encoding='utf-8') as f:
-                        if not config_loaded:
-                            self._config = json.load(f)
-                            config_loaded = True
-                        else:
-                            # 合并配置
-                            self._merge_config(json.load(f))
-            
-            if not config_loaded:
-                self._log_warning("No configuration files found, using default settings")
-                self._create_default_config()
-            
-        except Exception as e:
-            self._log_error(f"Failed to load configuration: {str(e)}")
-            self._create_default_config()
-    
-    def _create_default_config(self):
-        """创建默认配置"""
-        try:
-            # 尝试从默认配置文件加载
-            default_config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'default_config.json')
-            if os.path.exists(default_config_path):
-                with open(default_config_path, 'r', encoding='utf-8') as f:
-                    self._config = json.load(f)
-                self._save_default_config()
-                return
-            
-            # 如果默认配置文件不存在，创建一个最小配置
-            self._config = {
-                "deepseek": {
-                    "base_url": "https://api.deepseek.com",
-                    "timeout": 30.0,
-                    "max_retries": 3,
-                },
-                "logging": {
-                    "level": "INFO",
-                    "file": "app.log"
-                }
-            }
-            self._save_default_config()
-            
-        except Exception as e:
-            self._log_error(f"Failed to load default configuration: {str(e)}")
-            # 创建一个最小配置作为后备
-            self._config = {
-                "deepseek": {
-                    "base_url": "https://api.deepseek.com",
-                    "timeout": 30.0,
-                    "max_retries": 3,
-                },
-                "logging": {
-                    "level": "INFO",
-                    "file": "app.log"
-                }
-            }
-            self._save_default_config()
-    
-    def _save_default_config(self):
-        """保存默认配置"""
-        try:
-            # 创建配置目录
-            if not os.path.exists(self._config_dir):
-                os.makedirs(self._config_dir)
-            
-            # 保存配置
-            config_path = os.path.join(self._config_dir, 'config.json')
-            with open(config_path, 'w', encoding='utf-8') as f:
-                json.dump(self._config, f, indent=4, ensure_ascii=False)
-            self._log_info("Configuration saved")
-                
-        except Exception as e:
-            self._log_error(f"Failed to save configuration: {str(e)}")
-    
     def _merge_config(self, new_config: Dict[str, Any]):
-        """递归合并配置"""
+        """递归合并配置
+        
+        Args:
+            new_config: 新配置
+        """
+        self._log_info(f"Merging new config: {new_config}")
         for key, value in new_config.items():
             if key in self._config:
                 if isinstance(self._config[key], dict) and isinstance(value, dict):
@@ -188,74 +198,100 @@ class ConfigManager:
                 self._config[key] = value
     
     def _merge_config_recursive(self, target: Dict[str, Any], source: Dict[str, Any]):
-        """递归合并字典"""
+        """递归合并字典
+        
+        Args:
+            target: 目标字典
+            source: 源字典
+        """
         for key, value in source.items():
             if key in target and isinstance(target[key], dict) and isinstance(value, dict):
                 self._merge_config_recursive(target[key], value)
             else:
                 target[key] = value
     
-    def get_provider_config(self, provider: str) -> Dict[str, Any]:
-        """获取指定提供商的配置"""
-        if provider not in self._config:
-            raise KeyError(f"Provider '{provider}' not found")
-        return self._config[provider]
+    def get_config(self) -> Dict[str, Any]:
+        """获取完整配置
+        
+        Returns:
+            Dict[str, Any]: 完整配置
+        """
+        return self._config.copy()
     
-    def get_model_config(self, provider: str, model_name: str) -> Dict[str, Any]:
-        """获取指定模型的配置
+    def get_provider_config(self, provider: str) -> Dict[str, Any]:
+        """获取指定提供商的配置
         
         Args:
             provider: 提供商名称
-            model_name: 模型名称
             
         Returns:
-            Dict[str, Any]: 模型配置
+            Dict[str, Any]: 提供商配置
         """
-        if provider not in self._config:
-            raise KeyError(f"Provider '{provider}' not found")
-            
-        # 默认的模型配置
-        default_model_config = {
-            "max_tokens": 4000,
-            "temperature": 0.7,
-            "top_p": 1.0,
-            "frequency_penalty": 0.0,
-            "presence_penalty": 0.0,
-            "stop": None
-        }
+        if "providers" not in self._config or provider not in self._config["providers"]:
+            return {}
+        return self._config["providers"][provider].copy()
+    
+    def get_http_config(self) -> Dict[str, Any]:
+        """获取 HTTP 配置
         
-        # 如果找不到特定模型的配置，返回默认配置
-        if model_name not in self._config[provider]:
-            logger.debug(f"No specific config found for model '{model_name}' in provider '{provider}', using default config")
-            return default_model_config
+        Returns:
+            Dict[str, Any]: HTTP 配置
+        """
+        return self._config.get("http", {}).copy()
+    
+    def get_proxy_config(self, provider: str = None) -> Dict[str, str]:
+        """获取代理配置
+        
+        Args:
+            provider: 提供商名称，如果指定，将会检查该提供商是否使用代理
             
-        # 合并默认配置和特定模型的配置
-        model_config = default_model_config.copy()
-        model_config.update(self._config[provider][model_name])
-        return model_config
+        Returns:
+            Dict[str, str]: 代理配置
+        """
+        # 检查提供商是否使用代理
+        if provider:
+            provider_config = self.get_provider_config(provider)
+            if not provider_config.get("use_proxy", False):
+                return {}
+        
+        # 获取全局代理配置
+        proxy_config = self._config.get("proxy", {})
+        return proxy_config.copy()
     
     def get(self, key: str, default: Any = None) -> Any:
-        """获取配置值"""
+        """获取指定键的配置值
+        
+        Args:
+            key: 配置键
+            default: 默认值
+            
+        Returns:
+            Any: 配置值
+        """
         return self._config.get(key, default)
     
     def set(self, key: str, value: Any):
-        """设置配置值"""
+        """设置配置值
+        
+        Args:
+            key: 配置键
+            value: 配置值
+        """
         self._config[key] = value
-        self._save_default_config()
+
+
+# 配置工具函数
+def get_config_example() -> str:
+    """获取配置示例文件路径
     
-    def get_all(self) -> Dict[str, Any]:
-        """获取所有配置"""
-        return self._config.copy()
-    
-    def update(self, config: Dict[str, Any]):
-        """更新配置"""
-        self._merge_config(config)
-        self._save_default_config()
-    
-    def get_enabled_providers(self) -> List[str]:
-        """获取已启用的提供商列表"""
-        providers = []
-        for name, config in self._config.items():
-            if config.get('enabled', False):
-                providers.append(name)
-        return providers 
+    Returns:
+        str: 配置示例文件路径
+    """
+    return str(PROJECT_ROOT / "examples" / "config_examples" / "advanced_config.yaml")
+
+
+def show_config_example():
+    """显示配置示例文件位置"""
+    example_path = get_config_example()
+    print(f"高级配置示例文件位置：{example_path}")
+    print("您可以复制该文件并修改为自己的配置文件。") 

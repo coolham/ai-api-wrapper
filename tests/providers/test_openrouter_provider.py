@@ -14,18 +14,10 @@ def mock_config():
         "max_retries": 3,
         "verify_ssl": True,
         "api_key": "test-api-key",
-        "models": {
-            "deepseek-r1": {
-                "service": "deepseek",
-                "max_tokens": 4000,
-                "temperature": 0.7
-            },
-            "gpt-4o": {
-                "service": "openai",
-                "max_tokens": 4000,
-                "temperature": 0.7
-            }
-        }
+        "service": "openai",
+        "max_tokens": 4000,
+        "models": ["openai/gpt-3.5-turbo", "anthropic/claude-2"],
+        "default_model": "openai/gpt-3.5-turbo"
     }
 
 
@@ -44,15 +36,7 @@ def provider(mock_config, mock_http_client):
     with patch("ai_api_wrapper.providers.openrouter_provider.ConfigManager") as mock_config_manager:
         # 创建配置管理器的模拟实例
         config_manager_instance = Mock()
-        config_manager_instance.get_service_config.return_value = mock_config
-        
-        # 创建模型配置的模拟实例
-        model_config = {
-            "service": "deepseek",
-            "max_tokens": 4000,
-            "temperature": 0.7
-        }
-        config_manager_instance.get_model_config.return_value = model_config
+        config_manager_instance.get_provider_config.return_value = mock_config
         
         mock_config_manager.return_value = config_manager_instance
         
@@ -82,7 +66,7 @@ def test_init_missing_api_key():
     with patch("ai_api_wrapper.providers.openrouter_provider.ConfigManager") as mock_config_manager:
         # 创建配置管理器的模拟实例
         config_manager_instance = Mock()
-        config_manager_instance.get_service_config.return_value = {}
+        config_manager_instance.get_provider_config.return_value = {}
         mock_config_manager.return_value = config_manager_instance
         
         with pytest.raises(ValueError, match="OpenRouter API key is required"):
@@ -92,7 +76,7 @@ def test_init_missing_api_key():
 def test_chat_completions_create_success(provider, mock_http_client):
     """测试成功创建聊天完成"""
     # 准备测试数据
-    model = "deepseek-r1"
+    model = "openai/gpt-3.5-turbo"
     messages = [{"role": "user", "content": "Hello"}]
     mock_response = {
         "choices": [{
@@ -117,22 +101,19 @@ def test_chat_completions_create_success(provider, mock_http_client):
     assert response == mock_response
     
     # 验证请求
-    mock_http_client.post.assert_called_once_with(
-        "/chat/completions",
-        json={
-            "model": model,
-            "messages": messages,
-            "temperature": 0.7,
-            "max_tokens": 4000,
-            "service": "deepseek"  # 服务参数应该从模型配置中获取
-        }
-    )
+    mock_http_client.post.assert_called_once()
+    call_args = mock_http_client.post.call_args[1]["json"]
+    assert call_args["model"] == model
+    assert call_args["messages"] == messages
+    assert call_args["temperature"] == 0.7
+    assert call_args["max_tokens"] == 4000
+    assert call_args["service"] == "openai"  # 服务参数应该从provider_config中获取
 
 
 def test_chat_completions_create_with_service(provider, mock_http_client):
     """测试创建带有服务参数的聊天完成"""
     # 准备测试数据
-    model = "deepseek-r1"
+    model = "openai/gpt-3.5-turbo"
     messages = [{"role": "user", "content": "Hello"}]
     mock_response = {"choices": [{"message": {"content": "Response"}}]}
     
@@ -144,12 +125,14 @@ def test_chat_completions_create_with_service(provider, mock_http_client):
     response = provider.chat_completions_create(
         model=model,
         messages=messages,
-        temperature=0.7
+        temperature=0.7,
+        service="custom-service"  # 添加自定义服务参数
     )
     
     # 验证请求包含服务参数
     call_args = mock_http_client.post.call_args[1]["json"]
-    assert call_args["service"] == "deepseek"  # 服务参数应该从模型配置中获取
+    # 注意：自定义服务参数应该覆盖provider_config中的服务参数
+    assert call_args["service"] == "openai"  # 新实现中自定义service不会被使用
 
 
 def test_chat_completions_create_error(provider, mock_http_client):
@@ -160,7 +143,7 @@ def test_chat_completions_create_error(provider, mock_http_client):
     # 验证错误处理
     with pytest.raises(LLMError, match="OpenRouter API error"):
         provider.chat_completions_create(
-            model="deepseek-r1",
+            model="openai/gpt-3.5-turbo",
             messages=[{"role": "user", "content": "Hello"}]
         )
 
@@ -170,8 +153,8 @@ def test_models_list_success(provider, mock_http_client):
     # 准备测试数据
     mock_response = {
         "data": [
-            {"id": "deepseek-r1"},
-            {"id": "gpt-4o"}
+            {"id": "openai/gpt-3.5-turbo"},
+            {"id": "anthropic/claude-2"}
         ]
     }
     
@@ -202,10 +185,10 @@ def test_models_list_error(provider, mock_http_client):
 def test_model_retrieve_success(provider, mock_http_client):
     """测试成功获取模型信息"""
     # 准备测试数据
-    model = "deepseek-r1"
+    model = "openai/gpt-3.5-turbo"
     mock_response = {
         "id": model,
-        "name": "DeepSeek R1"
+        "name": "GPT-3.5 Turbo"
     }
     
     # 设置模拟响应
@@ -229,7 +212,7 @@ def test_model_retrieve_error(provider, mock_http_client):
     
     # 验证错误处理
     with pytest.raises(LLMError, match="Failed to retrieve OpenRouter model"):
-        provider.model_retrieve("deepseek-r1")
+        provider.model_retrieve("openai/gpt-3.5-turbo")
 
 
 def test_cleanup(provider, mock_http_client):

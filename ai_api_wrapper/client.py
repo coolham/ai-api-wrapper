@@ -56,7 +56,7 @@ class ChatCompletions:
                     message.content = content[end_idx + len("</think>"):].strip()
         return response
 
-    def _tool_runner(self, provider, model_name: str, messages: list, tools: any, max_turns: int, **kwargs):
+    def _tool_runner(self, provider, model_name: str, messages: list, tools: Any, max_turns: int, **kwargs):
         """处理工具执行循环"""
         if isinstance(tools, Tools):
             tools_instance = tools
@@ -144,16 +144,20 @@ class Chat:
 class Client:
     """AI API 客户端"""
     
-    def __init__(self, proxy_config: Optional[Dict[str, str]] = None):
-        """初始化客户端
-        
+    def __init__(self, config_path=None, api_key=None, base_url=None, provider=None):
+        """初始化 AI API 客户端
+
         Args:
-            proxy_config: 代理配置，格式为 {"http": "http://proxy:port", "https": "https://proxy:port"}
+            config_path: 配置文件路径，支持 YAML 格式
+            api_key: API 密钥
+            base_url: API 基础 URL
+            provider: 默认提供商名称
         """
+        # 初始化配置管理器
+        self.config_manager = ConfigManager(config_path=config_path)
         self.providers = {}  # 存储所有提供者实例
-        self.config_manager = ConfigManager()
-        self.proxy_config = proxy_config
-        logger.info("Client initialized with proxy config: %s", proxy_config)
+        self.proxy_config = None
+        logger.info("Client initialized with proxy config: %s", self.proxy_config)
         
     def _get_provider(self, provider_name: str) -> Provider:
         """获取指定的提供者实例

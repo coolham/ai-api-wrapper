@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Any, Type, Optional
+from typing import Callable, Dict, Any, Type, Optional, List, Union, Tuple
 from pydantic import BaseModel, create_model, Field, ValidationError
 import inspect
 import json
@@ -6,8 +6,8 @@ from docstring_parser import parse
 
 
 class Tools:
-    def __init__(self, tools: list[Callable] = None):
-        self._tools = {}
+    def __init__(self, tools: Optional[List[Callable]] = None):
+        self._tools: Dict[str, Dict[str, Any]] = {}
         if tools:
             for tool in tools:
                 self._add_tool(tool)
@@ -159,7 +159,7 @@ class Tools:
             for tool in self._tools.values()
         ]
 
-    def results_to_messages(self, results: list, message: any) -> list:
+    def results_to_messages(self, results: list, message: Any) -> list:
         """Converts results to messages."""
         # if message is empty return empty list
         if not message or len(results) == 0:

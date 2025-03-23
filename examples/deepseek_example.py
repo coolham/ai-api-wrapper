@@ -7,8 +7,8 @@ load_dotenv(find_dotenv())
 
 # 代理配置（如果需要）
 proxy_config = {
-    "http": "http://127.0.0.1:7890",
-    "https": "http://127.0.0.1:7890"
+    "http": "http://127.0.0.1:10808",
+    "https": "http://127.0.0.1:10808"
 }
 
 # 创建客户端（可以选择是否使用代理）

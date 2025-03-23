@@ -2,12 +2,19 @@ import sys
 from dotenv import load_dotenv, find_dotenv
 import ai_api_wrapper as ai
 import time
+import base64
+from pathlib import Path
 
 # 加载环境变量
 load_dotenv(find_dotenv())
 
 # 创建客户端
 client = ai.Client()
+
+def encode_image(image_path):
+    """将图片转换为 base64 编码"""
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
 
 # 准备消息
 messages = [
@@ -137,6 +144,60 @@ try:
     print(f"Assistant: {response['choices'][0]['message']['content']}\n")
 except Exception as e:
     print(f"Error in temperature test: {str(e)}")
+
+# 演示图片识别功能
+print("\nTesting image recognition:")
+print("-" * 50)
+
+# 准备测试图片路径
+image_path = Path("examples/test_images/test.jpg")
+if not image_path.exists():
+    print(f"测试图片不存在: {image_path}")
+else:
+    try:
+        # 将图片转换为 base64
+        base64_image = encode_image(image_path)
+        
+        # 准备包含图片的消息
+        vision_messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "请描述这张图片的内容。"
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_image}"
+                        }
+                    }
+                ]
+            }
+        ]
+        
+        # 使用 Grok Vision 模型
+        print("使用 Grok Vision 模型分析图片...")
+        response = client.chat.completions.create(
+            model="grok:grok-2-vision-1212",
+            messages=vision_messages,
+            max_tokens=1000
+        )
+        print(f"图片描述:\n{response['choices'][0]['message']['content']}\n")
+        
+        # 测试图片问答
+        print("测试图片问答...")
+        vision_messages[0]["content"][0]["text"] = "这张图片中的主要颜色是什么？"
+        response = client.chat.completions.create(
+            model="grok:grok-2-vision-1212",
+            messages=vision_messages,
+            max_tokens=1000
+        )
+        print(f"问答结果:\n{response['choices'][0]['message']['content']}\n")
+        
+    except Exception as e:
+        print(f"图片识别测试出错: {str(e)}")
 
 # 演示使用不同的服务提供商
 print("\nTesting different service providers:")

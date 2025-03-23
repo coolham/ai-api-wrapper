@@ -67,13 +67,16 @@ def chat_with_ai():
         # 处理响应
         print("\n=== AI 助手回答 ===")
         if isinstance(response, dict):
-            print(response.get("content", "无响应内容"))
+            # 尝试从OpenRouter响应中正确提取内容
+            content = response.get("choices", [{}])[0].get("message", {}).get("content", "无响应内容")
+            print(content)
             usage = response.get("usage", {})
             print(f"\nToken 使用情况：")
             print(f"- 提示词 tokens: {usage.get('prompt_tokens', 0)}")
             print(f"- 回复 tokens: {usage.get('completion_tokens', 0)}")
             print(f"- 总 tokens: {usage.get('total_tokens', 0)}")
         else:
+            # 对于对象形式的响应
             print(response.choices[0].message.content)
             print(f"\nToken 使用情况：")
             print(f"- 提示词 tokens: {response.usage.prompt_tokens}")
@@ -194,7 +197,7 @@ def main():
         
         # 运行模型列表示例
         print("2. 获取可用模型列表")
-        explore_available_models()
+        # explore_available_models()
         
         # 运行模型详情示例
         print("3. 获取模型详细信息")

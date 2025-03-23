@@ -5,12 +5,16 @@
 ## 1. 准备工作
 
 ### 1.1 环境要求
-- Python 3.8 或更高版本
+- Python 3.9 或更高版本
 - Poetry 包管理器
 - PyPI 账号（如果没有，请在 [PyPI](https://pypi.org/account/register/) 注册）
 
 ### 1.2 安装依赖
 ```bash
+
+# clear cache
+poetry cache clear --all pypi
+
 # 安装所有依赖，包括开发依赖
 poetry install --with dev
 ```
@@ -82,6 +86,11 @@ poetry build
 [pypi]
 username = __token__
 password = your-pypi-token
+```
+
+或者配置PyPI凭证
+```
+poetry config pypi-token.pypi 你的PyPI令牌
 ```
 
 ### 5.2 发布到 PyPI
